@@ -1,149 +1,548 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Угадай аватарку!</title>
-    <style>
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            margin: 0; padding: 15px; min-height: 100vh; color: white; 
-            display: flex; flex-direction: column; align-items: center; overflow: hidden;
-        }
-        .container { max-width: 100%; text-align: center; width: 100%; }
-        #avatar { 
-            width: 160px; height: 160px; border-radius: 50%; object-fit: cover; 
-            border: 4px solid rgba(255,255,255,0.4); box-shadow: 0 15px 30px rgba(0,0,0,0.3); 
-            margin: 10px 0;
-        }
-        .options { display: flex; gap: 12px; width: 100%; padding: 0 10px; }
-        .option { 
-            flex: 1; padding: 18px 10px; border-radius: 12px; cursor: pointer; transition: all 0.3s; 
-            border: 2px solid rgba(255,255,255,0.2); user-select: none; font-size: 16px; 
-            font-weight: 600; background: rgba(255,255,255,0.12); 
-        }
-        .option:hover:not(.disabled) { background: rgba(255,255,255,0.25); transform: translateY(-2px); }
-        .correct { background: rgba(0,200,0,0.7) !important; border-color: #00ff88 !important; }
-        .wrong { background: rgba(255,80,80,0.7) !important; border-color: #ff6666 !important; }
-        .disabled { opacity: 0.6; cursor: not-allowed; }
-        #score { font-size: 20px; font-weight: bold; margin: 10px 0; }
-        #progress { font-size: 14px; margin: 5px 0; opacity: 0.9; }
-        #status { font-size: 14px; margin: 8px 0; color: #ffd700; }
-        .game-over { font-size: 22px; color: #ffd700; margin: 15px 0; font-weight: bold; }
-        /* Telegram Web App оптимизация */
-        @supports (-webkit-appearance: none) {
-            body { padding: 10px; }
-            #avatar { width: 140px; height: 140px; }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div id="score">Счёт: <span id="scoreValue">0</span></div>
-        <div id="progress">Вопрос <span id="progressValue">1</span>/<span id="totalCount">95</span></div>
-        <img id="avatar" src="" alt="Аватарка">
-        <div id="status">Загрузка...</div>
-        <div id="options" class="options"></div>
-        <div id="gameOver" class="game-over" style="display:none;"></div>
-    </div>
-
-    <script src="avatars_list.js"></script>
-    <script>
-        let gameAvatars = [];
-        let currentIndex = 0;
-        let score = 0;
-
-        const statusEl = document.getElementById('status');
-        const totalEl = document.getElementById('totalCount');
-
-        function shuffleArray(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-        }
-
-        function startGame() {
-            gameAvatars = [...avatarsData];
-            shuffleArray(gameAvatars);
-            currentIndex = 0;
-            score = 0;
-            totalEl.textContent = avatarsData.length;
-            statusEl.textContent = `${avatarsData.length} аватарок загружено`;
-            updateScore();
-            nextQuestion();
-        }
-
-        function nextQuestion() {
-    if (currentIndex >= gameAvatars.length) {
-        endGame();
-        return;
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Аватарные игры</title>
+  <style>
+    :root{
+      --bg1:#667eea; --bg2:#764ba2;
+      --glass: rgba(255,255,255,.12);
+      --glass2: rgba(255,255,255,.18);
+      --border: rgba(255,255,255,.22);
+      --gold:#ffd700;
+      --good: rgba(0,200,0,.72);
+      --bad: rgba(255,80,80,.72);
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; padding:12px;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background: linear-gradient(135deg,var(--bg1),var(--bg2));
+      color:#fff; min-height:100vh;
+      overflow:hidden;
+    }
+    .wrap{ width:100%; max-width:420px; margin:0 auto; }
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:10px; margin-bottom:10px;
+    }
+    .linkbtn{
+      border:0; background:transparent; color:#fff; opacity:.9;
+      font-size:14px; padding:8px 6px; cursor:pointer;
+    }
+    .pill{
+      display:flex; gap:10px; justify-content:flex-end; align-items:center;
+      font-weight:700;
+    }
+    .pill span{
+      background: rgba(0,0,0,.18);
+      border:1px solid rgba(255,255,255,.15);
+      padding:6px 10px; border-radius:999px;
+      font-size:14px;
     }
 
-    const current = gameAvatars[currentIndex];
-    document.getElementById('avatar').src = `./avatars/${current.filename}`;
-    document.getElementById('progressValue').textContent = currentIndex + 1;
+    .screen{ display:none; }
+    .screen.active{ display:block; }
 
-    // ✅ СЛУЧАЙНЫЙ неправильный вариант (НЕ первый!)
-    let wrongAvatar;
-    do {
-        wrongAvatar = avatarsData[Math.floor(Math.random() * avatarsData.length)];
-    } while (wrongAvatar.name === current.name);  // пока не другой
+    /* Menu */
+    .menu{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+      margin-top:8px;
+    }
+    .menuBtn{
+      border:2px solid var(--border);
+      background: var(--glass);
+      border-radius:16px;
+      padding:16px 12px;
+      cursor:pointer;
+      transition:.2s;
+      text-align:center;
+      backdrop-filter: blur(10px);
+    }
+    .menuBtn:active{ transform: scale(.98); }
+    .menuTitle{ font-weight:800; font-size:16px; margin-top:6px; }
+    .menuSub{ font-size:13px; opacity:.9; margin-top:6px; }
 
-    const options = [current, wrongAvatar];
-    shuffleArray(options);
+    /* Guess */
+    .avatar{
+      width:150px; height:150px;
+      border-radius:50%;
+      object-fit:cover;
+      display:block;
+      margin:8px auto 10px;
+      border:4px solid rgba(255,255,255,.35);
+      box-shadow: 0 14px 28px rgba(0,0,0,.30);
+      background: rgba(0,0,0,.15);
+    }
+    .row2{
+      display:flex; gap:10px;
+      width:100%;
+    }
+    .opt{
+      flex:1;
+      border:2px solid var(--border);
+      background: var(--glass);
+      border-radius:14px;
+      padding:16px 10px;
+      font-weight:800;
+      font-size:15px;
+      cursor:pointer;
+      user-select:none;
+      transition:.2s;
+      text-align:center;
+    }
+    .opt:active{ transform: translateY(1px); }
+    .opt.disabled{ opacity:.6; cursor:not-allowed; }
+    .opt.good{ background: var(--good) !important; border-color:#00ff88 !important; }
+    .opt.bad{ background: var(--bad) !important; border-color:#ff6666 !important; }
 
-    const optionsDiv = document.getElementById('options');
-    optionsDiv.innerHTML = '';
-    options.forEach((opt) => {
-        const btn = document.createElement('div');
-        btn.className = 'option';
-        btn.textContent = opt.name;
-        btn.dataset.correct = opt.name === current.name;
-        btn.onclick = () => selectOption(btn);
-        optionsDiv.appendChild(btn);
-    });
+    .status{ min-height:18px; margin:8px 0 0; font-size:13px; color:var(--gold); }
 
-    statusEl.textContent = '';
+    /* Bingo (4x4) */
+    .grid{
+      width: 100%;
+      max-width: 360px;
+      margin: 8px auto 0;
+      display:grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap:10px;
+    }
+    .card{
+      width:100%;
+      aspect-ratio: 1 / 1;
+      perspective: 800px;
+    }
+    .cardInner{
+      width:100%; height:100%;
+      position:relative;
+      transform-style: preserve-3d;
+      transition: transform .45s ease;
+      border-radius:14px;
+    }
+    .card.flipped .cardInner{ transform: rotateY(180deg); }
+    .face{
+      position:absolute; inset:0;
+      border-radius:14px;
+      backface-visibility: hidden;
+      border:2px solid rgba(255,255,255,.20);
+      overflow:hidden;
+      display:flex; align-items:center; justify-content:center;
+      font-weight:900;
+    }
+    .front{
+      background: rgba(118, 75, 162, .75);
+      letter-spacing: 2px;
+      font-size: 22px;
+    }
+    .back{
+      transform: rotateY(180deg);
+      background-size: cover;
+      background-position: center;
+      background-color: rgba(0,0,0,.15);
+    }
+    .card.matched{
+      pointer-events:none;
+      opacity: 0;
+      transform: scale(.85);
+      transition: .25s ease;
+    }
+
+    /* Result */
+    .resultBox{
+      margin-top:14px;
+      border:2px solid var(--border);
+      background: rgba(0,0,0,.18);
+      border-radius:16px;
+      padding:16px 12px;
+      text-align:center;
+    }
+    .resultScore{ font-size:34px; font-weight:900; color: var(--gold); }
+    .resultTitle{ font-weight:900; font-size:18px; margin-bottom:6px; }
+    .primaryBtn{
+      margin-top:12px;
+      width:100%;
+      border:0;
+      background: rgba(255,255,255,.18);
+      border:2px solid rgba(255,255,255,.22);
+      color:#fff;
+      padding:14px 12px;
+      border-radius:14px;
+      font-weight:900;
+      cursor:pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <div class="topbar">
+      <button id="backBtn" class="linkbtn" style="visibility:hidden;">← Меню</button>
+      <div class="pill">
+        <span>⏱ <b id="timer">30</b></span>
+        <span>⭐ <b id="score">0</b></span>
+      </div>
+    </div>
+
+    <!-- MENU -->
+    <div id="menuScreen" class="screen active">
+      <div class="menu">
+        <div class="menuBtn" id="btnGuess">
+          <div style="font-size:30px;">👤?</div>
+          <div class="menuTitle">Угадай имя</div>
+          <div class="menuSub">2 варианта • 30 сек</div>
+        </div>
+        <div class="menuBtn" id="btnBingo">
+          <div style="font-size:30px;">🂠</div>
+          <div class="menuTitle">Авабинго</div>
+          <div class="menuSub">4×4 пары • 30 сек</div>
+        </div>
+      </div>
+
+      <div class="status" style="text-align:center;margin-top:12px;">
+        Выбери режим игры
+      </div>
+    </div>
+
+    <!-- GUESS -->
+    <div id="guessScreen" class="screen">
+      <img id="guessAvatar" class="avatar" src="" alt="avatar">
+      <div class="row2" id="guessOptions"></div>
+      <div id="guessStatus" class="status"></div>
+    </div>
+
+    <!-- BINGO -->
+    <div id="bingoScreen" class="screen">
+      <div id="bingoGrid" class="grid"></div>
+      <div id="bingoStatus" class="status"></div>
+    </div>
+
+    <!-- RESULT -->
+    <div id="resultScreen" class="screen">
+      <div class="resultBox">
+        <div id="resultTitle" class="resultTitle"></div>
+        <div class="resultScore"><span id="resultScore">0</span></div>
+        <div style="opacity:.9;margin-top:4px;">за 30 секунд</div>
+        <button class="primaryBtn" id="resultToMenu">Вернуться в меню</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="avatars_list.js"></script>
+  <script>
+    // avatars_list.js должен создавать: const avatarsData = [...]
+    // {filename:'Имя_Фамилия.png', name:'Имя Фамилия'}
+
+    // ---- Shared state ----
+    const SCREENS = {
+      menu: document.getElementById('menuScreen'),
+      guess: document.getElementById('guessScreen'),
+      bingo: document.getElementById('bingoScreen'),
+      result: document.getElementById('resultScreen')
+    };
+    const backBtn = document.getElementById('backBtn');
+    const timerEl = document.getElementById('timer');
+    const scoreEl = document.getElementById('score');
+
+    let mode = null;            // 'guess' | 'bingo'
+    let timer = 30;
+    let tick = null;
+    let score = 0;
+    let locked = false;
+
+    function show(screenKey){
+      Object.values(SCREENS).forEach(s => s.classList.remove('active'));
+      SCREENS[screenKey].classList.add('active');
+      backBtn.style.visibility = (screenKey === 'menu') ? 'hidden' : 'visible';
+    }
+
+    function stopTimer(){
+      if (tick) clearInterval(tick);
+      tick = null;
+    }
+
+    function startTimer(){
+      stopTimer();
+      timer = 30;
+      timerEl.textContent = timer;
+      tick = setInterval(() => {
+        timer--;
+        timerEl.textContent = timer;
+        if (timer <= 0) finish();
+      }, 1000);
+    }
+
+    function setScore(v){
+      score = v;
+      scoreEl.textContent = score;
+    }
+
+    function shuffle(arr){
+      for (let i = arr.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+    }
+
+    function finish(){
+      stopTimer();
+      locked = true;
+
+      const title = (mode === 'guess') ? 'Угадай имя' : 'Авабинго';
+      document.getElementById('resultTitle').textContent = title;
+      document.getElementById('resultScore').textContent = score;
+
+      show('result');
+    }
+
+    function goMenu(){
+      stopTimer();
+      locked = false;
+      mode = null;
+      setScore(0);
+      timerEl.textContent = '30';
+      show('menu');
+    }
+
+    backBtn.onclick = goMenu;
+    document.getElementById('resultToMenu').onclick = goMenu;
+
+    // ---- Game 1: Guess ----
+    const guessAvatarEl = document.getElementById('guessAvatar');
+    const guessOptionsEl = document.getElementById('guessOptions');
+    const guessStatusEl = document.getElementById('guessStatus');
+
+    let guessDeck = [];
+    let guessIndex = 0;
+
+    function nextGuess(){
+      if (locked || timer <= 0) return;
+
+      // Если закончились — просто перемешаем заново (за 30 сек может не успеть)
+      if (guessIndex >= guessDeck.length){
+        guessIndex = 0;
+        shuffle(guessDeck);
+      }
+
+      const current = guessDeck[guessIndex];
+      guessAvatarEl.src = './avatars/' + current.filename;
+
+      // Рандомный неправильный
+      let wrong;
+      do {
+        wrong = avatarsData[Math.floor(Math.random() * avatarsData.length)];
+      } while (wrong.name === current.name);
+
+      const options = [current, wrong];
+      shuffle(options);
+
+      guessOptionsEl.innerHTML = '';
+      options.forEach(opt => {
+        const b = document.createElement('div');
+        b.className = 'opt';
+        b.textContent = opt.name;
+        b.dataset.correct = (opt.name === current.name) ? '1' : '0';
+        b.onclick = () => chooseGuess(b);
+        guessOptionsEl.appendChild(b);
+      });
+
+      guessStatusEl.textContent = '';
+    }
+
+    function chooseGuess(btn){
+      if (locked) return;
+      const buttons = [...guessOptionsEl.querySelectorAll('.opt')];
+      buttons.forEach(x => x.classList.add('disabled'));
+
+      const isCorrect = btn.dataset.correct === '1';
+      if (isCorrect){
+        btn.classList.add('good');
+        setScore(score + 1);
+      } else {
+        btn.classList.add('bad');
+        const right = guessOptionsEl.querySelector('.opt[data-correct="1"]');
+        if (right) right.classList.add('good');
+        setScore(score - 1);
+      }
+
+      setTimeout(() => {
+        guessIndex++;
+        nextGuess();
+      }, 650);
+    }
+
+    function startGuess(){
+      mode = 'guess';
+      locked = false;
+      setScore(0);
+
+      guessDeck = [...avatarsData];
+      shuffle(guessDeck);
+      guessIndex = 0;
+
+      show('guess');
+      startTimer();
+      nextGuess();
+    }
+
+  // ---- Game 2: Bingo ----
+const bingoGridEl = document.getElementById('bingoGrid');
+const bingoStatusEl = document.getElementById('bingoStatus');
+
+let cards = [];
+let firstOpen = null;
+let matchedCount = 0;  // счётчик совпавших пар
+
+function randomAvatar(){
+  return avatarsData[Math.floor(Math.random() * avatarsData.length)];
 }
 
+function buildBingoDeck(){
+  const picks = [];
+  for (let i = 0; i < 8; i++){
+    const a = randomAvatar();
+    picks.push(a, a);
+  }
+  shuffle(picks);
 
-        function selectOption(selectedBtn) {
-            const isCorrect = selectedBtn.dataset.correct === 'true';
-            document.querySelectorAll('.option').forEach(btn => btn.classList.add('disabled'));
+  cards = picks.map((a, idx) => ({
+    key: a.filename + '|' + idx + '|' + Date.now(),
+    filename: a.filename,
+    open: false,
+    matched: false,
+    el: null
+  }));
 
-            if (isCorrect) {
-                selectedBtn.classList.add('correct');
-                score += 1;
-                statusEl.textContent = '+1 балл!';
-            } else {
-                selectedBtn.classList.add('wrong');
-                document.querySelector('[data-correct="true"]').classList.add('correct');
-                statusEl.textContent = '-1 балл';
-            }
-            updateScore();
+  firstOpen = null;
+  matchedCount = 0;
+}
 
-            setTimeout(() => {
-                currentIndex++;
-                nextQuestion();
-            }, 1200);
+function renderBingo(cascade = false){
+  bingoGridEl.innerHTML = '';
+  cards.forEach((c, idx) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.i = String(idx);
+
+    // Каскадная анимация
+    if (cascade){
+      card.style.opacity = '0';
+      card.style.transform = 'scale(0.7)';
+      card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+      setTimeout(() => {
+        card.style.opacity = '1';
+        card.style.transform = 'scale(1)';
+      }, idx * 60);  // задержка 60ms между карточками
+    }
+
+    const inner = document.createElement('div');
+    inner.className = 'cardInner';
+
+    const front = document.createElement('div');
+    front.className = 'face front';
+    front.textContent = 'АЕ';
+
+    const back = document.createElement('div');
+    back.className = 'face back';
+    back.style.backgroundImage = `url("./avatars/${c.filename}")`;
+
+    inner.appendChild(front);
+    inner.appendChild(back);
+    card.appendChild(inner);
+
+    card.onclick = () => clickBingo(idx);
+
+    c.el = card;
+    bingoGridEl.appendChild(card);
+  });
+
+  syncBingoUI();
+}
+
+function syncBingoUI(){
+  cards.forEach((c, idx) => {
+    if (!c.el) return;
+    c.el.classList.toggle('flipped', c.open || c.matched);
+    c.el.classList.toggle('matched', c.matched);
+  });
+}
+
+function clickBingo(idx){
+  if (locked || timer <= 0) return;
+
+  const c = cards[idx];
+  if (c.open || c.matched) return;
+
+  c.open = true;
+  syncBingoUI();
+
+  if (firstOpen === null){
+    firstOpen = idx;
+    bingoStatusEl.textContent = '';
+  } else {
+    const i1 = firstOpen;
+    const i2 = idx;
+    
+    if (cards[i1].filename === cards[i2].filename){
+      // Матч! +10, схлопываем (исчезают)
+      cards[i1].matched = true;
+      cards[i2].matched = true;
+      setScore(score + 10);
+      syncBingoUI();
+      matchedCount += 2;
+
+      setTimeout(() => {
+        if (locked) return;
+        
+        // Проверка: все 16 собраны?
+        if (matchedCount >= 16){
+          bingoStatusEl.textContent = '🎉 Новый набор!';
+          setTimeout(() => {
+            if (locked) return;
+            buildBingoDeck();
+            renderBingo(true);  // каскад!
+          }, 400);
         }
+        
+        firstOpen = null;
+      }, 300);
+    } else {
+      // Не совпали
+      setTimeout(() => {
+        if (locked) return;
+        cards[i1].open = false;
+        cards[i2].open = false;
+        syncBingoUI();
+        firstOpen = null;
+      }, 400);
+    }
+  }
+}
 
-        function updateScore() {
-            document.getElementById('scoreValue').textContent = score;
-        }
+function startBingo(){
+  mode = 'bingo';
+  locked = false;
+  setScore(0);
+  bingoStatusEl.textContent = '';
 
-        function endGame() {
-            document.getElementById('avatar').style.display = 'none';
-            document.getElementById('options').innerHTML = '';
-            document.getElementById('gameOver').innerHTML = `Игра окончена!<br>Счёт: ${score}/${avatarsData.length}`;
-            document.getElementById('gameOver').style.display = 'block';
-            statusEl.textContent = 'Обнови страницу для новой игры';
-        }
+  buildBingoDeck();
+  show('bingo');
+  renderBingo(false);  // первый раз без каскада
+  startTimer();
+}
 
-        window.onload = () => startGame();
-    </script>
+    // ---- Bind menu ----
+    document.getElementById('btnGuess').onclick = startGuess;
+    document.getElementById('btnBingo').onclick = startBingo;
+
+    // ---- Boot ----
+    // защита: если avatarsData не подгрузился
+    if (!window.avatarsData || !Array.isArray(window.avatarsData) || window.avatarsData.length < 2){
+      document.querySelector('.status').textContent = 'Ошибка: не найден avatars_list.js или мало аватарок или я не вайбкодер';
+    }
+  </script>
 </body>
 </html>
-
