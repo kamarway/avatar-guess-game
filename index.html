@@ -76,33 +76,38 @@
         }
 
         function nextQuestion() {
-            if (currentIndex >= gameAvatars.length) {
-                endGame();
-                return;
-            }
+    if (currentIndex >= gameAvatars.length) {
+        endGame();
+        return;
+    }
 
-            const current = gameAvatars[currentIndex];
-            document.getElementById('avatar').src = `./avatars/${current.filename}`;
-            document.getElementById('progressValue').textContent = currentIndex + 1;
+    const current = gameAvatars[currentIndex];
+    document.getElementById('avatar').src = `./avatars/${current.filename}`;
+    document.getElementById('progressValue').textContent = currentIndex + 1;
 
-            // ТОЛЬКО 2 варианта: правильный + 1 неправильный
-            const wrongAvatar = avatarsData.find(a => a.name !== current.name);
-            const options = [current, wrongAvatar || current];
-            shuffleArray(options);
+    // ✅ СЛУЧАЙНЫЙ неправильный вариант (НЕ первый!)
+    let wrongAvatar;
+    do {
+        wrongAvatar = avatarsData[Math.floor(Math.random() * avatarsData.length)];
+    } while (wrongAvatar.name === current.name);  // пока не другой
 
-            const optionsDiv = document.getElementById('options');
-            optionsDiv.innerHTML = '';
-            options.forEach((opt) => {
-                const btn = document.createElement('div');
-                btn.className = 'option';
-                btn.textContent = opt.name;
-                btn.dataset.correct = opt.name === current.name;
-                btn.onclick = () => selectOption(btn);
-                optionsDiv.appendChild(btn);
-            });
+    const options = [current, wrongAvatar];
+    shuffleArray(options);
 
-            statusEl.textContent = '';
-        }
+    const optionsDiv = document.getElementById('options');
+    optionsDiv.innerHTML = '';
+    options.forEach((opt) => {
+        const btn = document.createElement('div');
+        btn.className = 'option';
+        btn.textContent = opt.name;
+        btn.dataset.correct = opt.name === current.name;
+        btn.onclick = () => selectOption(btn);
+        optionsDiv.appendChild(btn);
+    });
+
+    statusEl.textContent = '';
+}
+
 
         function selectOption(selectedBtn) {
             const isCorrect = selectedBtn.dataset.correct === 'true';
@@ -141,3 +146,4 @@
     </script>
 </body>
 </html>
+
