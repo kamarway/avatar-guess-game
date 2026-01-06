@@ -538,11 +538,8 @@ function startBingo(){
     document.getElementById('btnGuess').onclick = startGuess;
     document.getElementById('btnBingo').onclick = startBingo;
 
-    // ---- Boot ----
-    // защита: если avatarsData не подгрузился
-    if (!window.avatarsData || !Array.isArray(window.avatarsData) || window.avatarsData.length < 2){
-      document.querySelector('.status').textContent = 'Ошибка: не найден avatars_list.js или мало аватарок или я не вайбкодер';
-    }
+    // Готово к игре!
   </script>
 </body>
 </html>
+
